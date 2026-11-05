@@ -11,31 +11,73 @@ library(flexdashboard)
 library(tidyverse)
 library(p8105.datasets)
 library(plotly)
+```
 
+```{r}
 data("rest_inspec")
+
+rest_inspec =
+  rest_inspec |>
+  select(
+    camis, inspection_date, inspection_type,
+    boro, latitude, longitude, score, grade, zipcode, critical_flag, 
+    dba, cuisine_description
+  )
 ```
 
-Column {data-width=650}
+Column {data-width=500}
 -----------------------------------------------------------------------
 
-### Chart A
+### Restaurant Location Colored by Most Recent A-C Grade in Manhattan
 
 ```{r}
-
+rest_inspec |>
+  filter(
+    grade %in% c("A", "B", "C"),
+    !is.na(latitude),
+    !is.na(longitude),
+    latitude != 0,
+    longitude != 0,
+    boro == "Manhattan"
+    ) |>
+  group_by(camis) |>
+  slice_max(inspection_date, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  mutate(text_label = str_c("Restaurant: ", dba, "\nGrade: ", grade)) |> 
+  plot_ly(
+    x = ~longitude, y = ~latitude, type = "scatter", mode = "markers",
+    color = ~grade, text = ~text_label, alpha = 0.5)
 ```
 
-Column {data-width=350}
+Column {data-width=400}
 -----------------------------------------------------------------------
 
-### Chart B
+### Inspection Score by Cuisine Type {data-height=525}
 
 ```{r}
-
+rest_inspec |> 
+  filter(cuisine_description %in% c("Mexican", "Greek", "Japanese", "Indian", "Spanish", "Thai", "Bakery", "Chinese", "Italian", "Mediterranean"),!is.na(score)) |>
+  distinct(camis, inspection_date, inspection_type, .keep_all = TRUE) |>
+  mutate(cuisine_description = fct_reorder(cuisine_description, score)) |> 
+  plot_ly(y = ~score, color = ~cuisine_description, type = "box", colors = "viridis") |>
+  layout(
+    xaxis = list(title = "Cuisine Type"),
+    yaxis = list(title = "Inspection Score")
+  )
 ```
 
-### Chart C
+### Top 15 Manhattan Zipcodes by Critical Violation Count {data-height=475}
 
 ```{r}
-
+rest_inspec |>
+  filter(boro == "Manhattan", critical_flag == "Y", !is.na(zipcode)) |>
+  count(zipcode) |>
+  slice_max(n, n = 15) |>
+  mutate(zipcode = fct_reorder(as.factor(zipcode), n)) |>
+  plot_ly(x = ~zipcode, y = ~n, type = "bar") |>
+  layout(
+    xaxis = list(title = "ZIP Code"),
+    yaxis = list(title = "Critical Violations")
+  )
 ```
 
